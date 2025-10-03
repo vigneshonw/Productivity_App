@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>100 Days Challenge - Productivity App</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <style>
+    body {
+      background: #eef2f7;
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .challenge-container {
+      background: white;
+      padding: 40px 35px;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+      width: 420px;
+      box-sizing: border-box;
+      text-align: center;
+      opacity: 0;
+      animation: fadeIn 1s forwards;
+      position: relative;
+      overflow: visible;
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    h2 {
+      margin-bottom: 30px;
+      color: #2c3e50;
+      font-weight: 700;
+    }
+
+    .progress-info {
+      font-size: 1.1rem;
+      color: #34495e;
+      margin-bottom: 30px;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 20px;
+      background-color: #ecf0f1;
+      border-radius: 15px;
+      overflow: hidden;
+      margin-bottom: 30px;
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background-color: #3498db;
+      width: {{ "%.2f"|format(percentage) }}%;
+      max-width: 100%;
+      transition: width 1s ease-in-out;
+      border-radius: 15px 0 0 15px;
+      box-shadow: 0 2px 15px rgba(52, 152, 219, 0.6);
+    }
+
+    form input[type="submit"] {
+      background-color: #3498db;
+      border: none;
+      color: white;
+      font-weight: 700;
+      font-size: 1.1rem;
+      padding: 14px 30px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      width: 100%;
+      box-shadow: 0 3px 10px rgba(52, 152, 219, 0.4);
+      position: relative;
+      z-index: 1;
+    }
+
+    form input[type="submit"]:hover {
+      background-color: #2980b9;
+      box-shadow: 0 5px 15px rgba(41, 128, 185, 0.6);
+    }
+
+    .finished-message {
+      color: #27ae60;
+      font-weight: 700;
+      font-size: 1.3rem;
+      margin: 30px 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .nav-link {
+      margin-top: 25px;
+      display: inline-block;
+      font-size: 1rem;
+      color: #3498db;
+      text-decoration: none;
+      font-weight: 600;
+      padding: 8px 18px;
+      border: 1.5px solid #3498db;
+      border-radius: 8px;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      position: relative;
+      z-index: 1;
+    }
+
+    .nav-link:hover {
+      background-color: #3498db;
+      color: white;
+    }
+
+    .flash-messages {
+      margin-top: 20px;
+      padding: 12px;
+      background-color: #f8d7da;
+      color: #721c24;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    canvas#dailyConfetti {
+      display: none;
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    canvas#challengeConfetti {
+      position: fixed;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 9999;
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <section class="challenge-container">
+    <h2>100 Days Self-Improvement Challenge</h2>
+
+    <div class="progress-info">
+      <p><strong>Current Day:</strong> {{ day }}</p>
+      <p><strong>Days Completed:</strong> {{ completed }}</p>
+      <p><strong>Overall Progress:</strong> {{ "%.2f"|format(percentage) }}%</p>
+    </div>
+
+    <div class="progress-bar-bg" aria-label="Progress Bar">
+      <div class="progress-bar-fill"></div>
+    </div>
+
+    {% if day <= 100 %}
+    <form method="POST">
+      <input type="submit" value="Mark Day {{ day }} as Completed" />
+      <canvas id="dailyConfetti" width="400" height="100"></canvas>
+    </form>
+    {% else %}
+    <p class="finished-message">
+      🎉 Congratulations! You've completed the 100 Days Challenge! Keep the momentum going!
+    </p>
+    <canvas id="challengeConfetti"></canvas>
+    {% endif %}
+
+    <a href="{{ url_for('dashboard') }}" class="nav-link">Back to Dashboard</a>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="flash-messages">
+          {% for msg in messages %}
+            <p>{{ msg }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+  </section>
+
+  <script>
+    // Daily completion confetti
+    const dailyCanvas = document.getElementById('dailyConfetti');
+    if(dailyCanvas){
+      const dailyCtx = dailyCanvas.getContext('2d');
+      let dailyParticles = [];
+
+      function createDailyParticle() {
+        return {
+          x: Math.random() * dailyCanvas.width,
+          y: dailyCanvas.height,
+          size: Math.random() * 6 + 4,
+          speedY: Math.random() * 2 + 1,
+          color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+        };
+      }
+
+      function animateDailyConfetti() {
+        dailyCtx.clearRect(0, 0, dailyCanvas.width, dailyCanvas.height);
+        dailyParticles.forEach(p => {
+          p.y -= p.speedY;
+          dailyCtx.fillStyle = p.color;
+          dailyCtx.fillRect(p.x, p.y, p.size, p.size);
+        });
+        dailyParticles = dailyParticles.filter(p => p.y + p.size > 0);
+        if (dailyParticles.length > 0) {
+          requestAnimationFrame(animateDailyConfetti);
+        } else {
+          dailyCanvas.style.display = 'none';
+        }
+      }
+
+      function triggerDailyConfetti() {
+        dailyParticles = [];
+        for (let i = 0; i < 50; i++) {
+          dailyParticles.push(createDailyParticle());
+        }
+        dailyCanvas.style.display = 'block';
+        animateDailyConfetti();
+      }
+
+      // Trigger for daily completion: check flash messages or form success
+      window.onload = function() {
+        const messages = document.querySelectorAll('.flash-messages p');
+        messages.forEach(msg => {
+          if (msg.textContent.includes('completed')) {
+            triggerDailyConfetti();
+          }
+        });
+      };
+    }
+
+    // Overall challenge confetti
+    const challengeCanvas = document.getElementById('challengeConfetti');
+    if(challengeCanvas){
+      const ctx = challengeCanvas.getContext('2d');
+      const confettiCount = 150;
+      const confetti = [];
+
+      function randomRange(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      class Confetto {
+        constructor() {
+          this.x = randomRange(0, challengeCanvas.width);
+          this.y = randomRange(-challengeCanvas.height, 0);
+          this.size = randomRange(5, 12);
+          this.color = `hsl(${Math.floor(randomRange(0, 360))}, 70%, 60%)`;
+          this.speedX = randomRange(-2, 2);
+          this.speedY = randomRange(2, 7);
+          this.angle = randomRange(0, 360);
+          this.rotationSpeed = randomRange(2, 7);
+        }
+        update() {
+          this.x += this.speedX;
+          this.y += this.speedY;
+          this.angle += this.rotationSpeed;
+          if (this.y > challengeCanvas.height) {
+            this.y = randomRange(-challengeCanvas.height, 0);
+            this.x = randomRange(0, challengeCanvas.width);
+          }
+        }
+        draw() {
+          ctx.save();
+          ctx.translate(this.x, this.y);
+          ctx.rotate(this.angle * Math.PI / 180);
+          ctx.fillStyle = this.color;
+          ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size*0.4);
+          ctx.restore();
+        }
+      }
+      function setupConfetti() {
+        for (let i = 0; i < confettiCount; i++) {
+          confetti.push(new Confetto());
+        }
+      }
+      function render() {
+        ctx.clearRect(0, 0, challengeCanvas.width, challengeCanvas.height);
+        confetti.forEach(c => {
+          c.update();
+          c.draw();
+        });
+        requestAnimationFrame(render);
+      }
+
+      {% if day > 100 %}
+      setupConfetti();
+      render();
+      {% endif %}
+    }
+  </script>
+</body>
+</html>
